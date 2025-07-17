@@ -1,0 +1,17 @@
+# Ignorer les dépendances Node.js dans frontend et backend
+frontend/node_modules/
+backend/node_modules/
+
+# Ignorer les fichiers d'environnement
+frontend/.env
+backend/.env
+.env
+
+# Ignorer les fichiers log
+*.log
+
+# Ignorer les fichiers système/IDE
+.DS_Store
+*.swp
+.idea/
+.vscode/
