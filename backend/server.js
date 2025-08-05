@@ -6,6 +6,7 @@ const Database = require('./src/config/database');
 
 const contactRoutes = require('./src/api/routes/contactRoutes');
 const smsRoutes = require('./src/api/routes/smsRoutes');
+const vonageRoutes = require('./src/api/routes/vonageRoutes');
 const testRoutes = require('./src/api/routes/testRoutes');
 
 const app = express();
@@ -22,6 +23,7 @@ const db = new Database();
 // Routes
 app.use('/api/contacts', contactRoutes);
 app.use('/api/sms', smsRoutes);
+app.use('/api/vonage-sms', vonageRoutes);
 app.use('/api', testRoutes);
 
 
