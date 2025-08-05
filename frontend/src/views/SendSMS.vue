@@ -32,6 +32,45 @@
           </div>
           <div class="card-body">
             <form @submit.prevent="handleSendSms">
+              <!-- Sélection du service d'envoi -->
+              <div class="mb-4">
+                <label class="form-label">Service d'envoi</label>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-check">
+                      <input 
+                        class="form-check-input" 
+                        type="radio" 
+                        name="smsService" 
+                        id="smsGateway"
+                        value="smsgateway"
+                        v-model="selectedSmsService"
+                      >
+                      <label class="form-check-label" for="smsGateway">
+                        <i class="fas fa-mobile-alt me-2"></i>
+                        SMS-Gateway (Smartphone)
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-check">
+                      <input 
+                        class="form-check-input" 
+                        type="radio" 
+                        name="smsService" 
+                        id="vonageService"
+                        value="vonage"
+                        v-model="selectedSmsService"
+                      >
+                      <label class="form-check-label" for="vonageService">
+                        <i class="fas fa-cloud me-2"></i>
+                        Service Vonage
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Sélection du mode d'envoi -->
               <div class="mb-4">
                 <label class="form-label">Mode d'envoi</label>
@@ -280,6 +319,7 @@ export default {
   name: 'SendSmsPage',
   data() {
     return {
+      selectedSmsService: 'smsgateway', // 'smsgateway' or 'vonage'
       sendMode: 'contacts',
       selectedContacts: [],
       phoneNumbersText: '',
@@ -345,7 +385,8 @@ export default {
       if (!this.canSend) return
       
       const payload = {
-        message: this.message.trim()
+        message: this.message.trim(),
+        service: this.selectedSmsService
       }
       
       if (this.sendMode === 'contacts') {

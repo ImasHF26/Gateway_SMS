@@ -40,11 +40,17 @@ const actions = {
     }
   },
 
-  async sendSms({ commit }, { phoneNumbers, message, contactIds }) {
+  async sendSms({ commit }, { phoneNumbers, message, contactIds, service }) {
     commit('SET_SENDING', true)
     commit('SET_ERROR', null)
     try {
-      const response = await api.sendSms({ phoneNumbers, message, contactIds })
+      const payload = { phoneNumbers, message, contactIds };
+      let response;
+      if (service === 'vonage') {
+        response = await api.sendVonageSms(payload);
+      } else {
+        response = await api.sendSms(payload);
+      }
       return { success: true, data: response.data }
     } catch (error) {
       const errorMessage = error.response?.data?.error || 'Erreur lors de l\'envoi du SMS'

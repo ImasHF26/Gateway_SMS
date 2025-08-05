@@ -44,6 +44,10 @@ export default {
   sendSms(data) {
     return apiClient.post('/sms/send', data)
   },
+
+  sendVonageSms(data) {
+    return apiClient.post('/vonage-sms/send', data)
+  },
   
   sendSmsToContact(contactId, message) {
     return apiClient.post(`/sms/send-to-contact/${contactId}`, { message })
