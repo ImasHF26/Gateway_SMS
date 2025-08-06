@@ -7,6 +7,7 @@ class VonageSmsService {
 
   async sendSms(to, text) {
     const from = process.env.VONAGE_BRAND_NAME || 'University';
+    console.log(`Sending SMS from ${from} to ${to} with message: ${text}`);
     try {
       const responseData = await this.vonage.sms.send({ to, from, text });
       console.log('Message sent successfully', responseData);
