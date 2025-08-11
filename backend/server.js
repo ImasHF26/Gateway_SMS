@@ -12,13 +12,11 @@ const testRoutes = require('./src/api/routes/testRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
-
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
 
 // Initialisation de la base de données
 const db = new Database();
@@ -28,10 +26,6 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/vonage-sms', vonageRoutes);
 app.use('/api', testRoutes);
-
-app.post('/api/contacts/csv', upload.single('csvFile'), (req, res, next) => {
-    contactRoutes(req,res,next)
-});
 
 
 

@@ -102,6 +102,44 @@ class Database {
     });
   }
 
+  addContacts(contacts) {
+    return new Promise((resolve, reject) => {
+      if (contacts.length === 0) {
+        return resolve({ changes: 0 });
+      }
+      
+      const placeholders = contacts.map(() => '(?, ?, ?)').join(',');
+      const sql = `INSERT OR IGNORE INTO contacts (name, phone, email) VALUES ${placeholders}`;
+      
+      const params = [];
+      contacts.forEach(c => {
+        params.push(c.name, c.phone, c.email || null);
+      });
+
+      const self = this;
+      this.db.serialize(() => {
+        self.db.run('BEGIN TRANSACTION', (err) => {
+          if (err) return reject(err);
+        });
+
+        self.db.run(sql, params, function(err) {
+          if (err) {
+            return self.db.run('ROLLBACK', () => reject(err));
+          }
+          
+          const changes = this.changes;
+          
+          self.db.run('COMMIT', (err) => {
+            if (err) {
+              return self.db.run('ROLLBACK', () => reject(err));
+            }
+            resolve({ changes });
+          });
+        });
+      });
+    });
+  }
+
   updateContact(id, contact) {
     return new Promise((resolve, reject) => {
       const { name, phone, email } = contact;
