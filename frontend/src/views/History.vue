@@ -3,7 +3,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>
         <i class="fas fa-history me-2"></i>
-        Historique des SMS
+        Historique des SMS Envoyés
       </h2>
       <button class="btn btn-outline-primary" @click="loadHistory">
         <i class="fas fa-sync-alt me-2"></i>

@@ -111,45 +111,61 @@
               </div>
 
               <!-- Sélection des contacts -->
-              <div v-if="sendMode === 'contacts'" class="mb-4">
+                <div v-if="sendMode === 'contacts'" class="mb-4">
                 <label class="form-label">Sélectionner les contacts</label>
                 <div v-if="allContacts.length === 0" class="alert alert-info">
                   <i class="fas fa-info-circle me-2"></i>
                   Aucun contact disponible. 
                   <router-link to="/contacts">Ajoutez des contacts</router-link> d'abord.
                 </div>
-                <div v-else class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                <div v-else>
+                  <!-- Champ de recherche -->
+                  <div class="mb-2">
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="Rechercher un contact par nom ou numéro..."
+                    v-model="contactSearchQuery"
+                  >
+                  </div>
+
+                  <div class="border rounded p-3" style="max-height: 250px; overflow-y: auto;">
                   <div class="form-check mb-2">
                     <input 
-                      class="form-check-input" 
-                      type="checkbox" 
-                      id="selectAll"
-                      @change="toggleSelectAll"
-                      :checked="selectedContacts.length === allContacts.length && allContacts.length > 0"
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="selectAll"
+                    @change="toggleSelectAll"
+                    :checked="selectedContacts.length === allContacts.length && allContacts.length > 0"
+                    :disabled="contactSearchQuery.length > 0"
                     >
                     <label class="form-check-label fw-bold" for="selectAll">
-                      Sélectionner tout ({{ allContacts.length }} contacts)
+                    Sélectionner tout ({{ allContacts.length }} contacts)
                     </label>
                   </div>
                   <hr>
-                  <div v-for="contact in allContacts" :key="contact.id" class="form-check">
+                  <div v-for="contact in filteredContacts" :key="contact.id" class="form-check">
                     <input 
-                      class="form-check-input" 
-                      type="checkbox" 
-                      :id="`contact-${contact.id}`"
-                      :value="contact.id"
-                      v-model="selectedContacts"
+                    class="form-check-input" 
+                    type="checkbox" 
+                    :id="`contact-${contact.id}`"
+                    :value="contact.id"
+                    v-model="selectedContacts"
                     >
                     <label class="form-check-label" :for="`contact-${contact.id}`">
-                      <i class="fas fa-user me-2 text-primary"></i>
-                      {{ contact.name }} - {{ contact.phone }}
+                    <i class="fas fa-user me-2 text-primary"></i>
+                    {{ contact.name }} - {{ contact.phone }}
                     </label>
                   </div>
+                  <div v-if="filteredContacts.length === 0" class="text-center text-muted">
+                    Aucun contact ne correspond à votre recherche.
+                  </div>
+                  </div>
                 </div>
-                <div class="form-text">
+                <div class="form-text mt-2">
                   {{ selectedContacts.length }} contact(s) sélectionné(s)
                 </div>
-              </div>
+                </div>
 
               <!-- Saisie des numéros -->
               <div v-if="sendMode === 'numbers'" class="mb-4">
@@ -324,13 +340,29 @@ export default {
       selectedContacts: [],
       phoneNumbersText: '',
       message: '',
-      successMessage: ''
+      successMessage: '',
+      contactSearchQuery: ''
     }
   },
   computed: {
     ...mapGetters('contacts', ['allContacts']),
     ...mapGetters('sms', { isSending: 'isSending', error: 'getError' }),
     
+    filteredContacts() {
+      if (!this.allContacts) {
+        return [];
+      }
+      if (!this.contactSearchQuery) {
+        return this.allContacts;
+      }
+      const query = this.contactSearchQuery.toLowerCase();
+      return this.allContacts.filter(contact => {
+        const name = contact.name ? contact.name.toLowerCase() : '';
+        const phone = contact.phone ? contact.phone.toString().toLowerCase() : '';
+        return name.includes(query) || phone.includes(query);
+      });
+    },
+
     parsedPhoneNumbers() {
       if (!this.phoneNumbersText.trim()) return []
       
