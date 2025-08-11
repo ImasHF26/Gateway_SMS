@@ -40,6 +40,16 @@ export default {
     return apiClient.delete(`/contacts/${id}`)
   },
 
+  addContactsFromCsv(file) {
+    const formData = new FormData();
+    formData.append('csvFile', file);
+    return apiClient.post('/contacts/csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+
   // SMS
   sendSms(data) {
     return apiClient.post('/sms/send', data)

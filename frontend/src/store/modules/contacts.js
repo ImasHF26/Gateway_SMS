@@ -45,6 +45,22 @@ const actions = {
     }
   },
 
+  async addContactsFromCsv({ commit, dispatch }, file) {
+    commit('SET_LOADING', true);
+    commit('SET_ERROR', null);
+    try {
+      const response = await api.addContactsFromCsv(file);
+      await dispatch('loadContacts');
+      return { success: true, message: response.message };
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || 'Erreur lors de l\'ajout des contacts depuis le fichier CSV';
+      commit('SET_ERROR', errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      commit('SET_LOADING', false);
+    }
+  },
+
   async addContact({ commit }, contact) {
     commit('SET_LOADING', true)
     commit('SET_ERROR', null)

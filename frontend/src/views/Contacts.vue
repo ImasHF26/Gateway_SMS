@@ -9,6 +9,10 @@
         <i class="fas fa-plus me-2"></i>
         Ajouter un contact
       </button>
+      <button class="btn btn-secondary ms-2" @click="showCsvModal = true">
+        <i class="fas fa-file-csv me-2"></i>
+        Importer depuis CSV
+      </button>
     </div>
 
     <!-- Messages d'erreur/succès -->
@@ -110,6 +114,43 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal d'import CSV -->
+    <div class="modal fade" :class="{ show: showCsvModal }" :style="{ display: showCsvModal ? 'block' : 'none' }">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Importer des contacts depuis un fichier CSV</h5>
+            <button type="button" class="btn-close" @click="closeCsvModal"></button>
+          </div>
+          <form @submit.prevent="uploadCsv">
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="csvFile" class="form-label">Fichier CSV</label>
+                <input 
+                  type="file" 
+                  class="form-control" 
+                  id="csvFile"
+                  @change="handleFileUpload"
+                  accept=".csv"
+                  required
+                >
+                <div class="form-text">
+                  Le fichier CSV doit contenir les colonnes "name" et "phone". La colonne "email" est optionnelle.
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" @click="closeCsvModal">Annuler</button>
+              <button type="submit" class="btn btn-primary" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                Importer
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -232,7 +273,7 @@
     </div>
 
     <!-- Backdrop pour les modals -->
-    <div v-if="showAddModal || showSmsModal || showDeleteModal" class="modal-backdrop fade show"></div>
+    <div v-if="showAddModal || showSmsModal || showDeleteModal || showCsvModal" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
@@ -246,12 +287,14 @@ export default {
       showAddModal: false,
       showSmsModal: false,
       showDeleteModal: false,
+      showCsvModal: false,
       editingContact: null,
       contactToDelete: null,
       selectedContact: null,
       searchTerm: '',
       successMessage: '',
       smsMessage: '',
+      csvFile: null,
       contactForm: {
         name: '',
         phone: '',
@@ -279,9 +322,27 @@ export default {
     }
   },
   methods: {
-    ...mapActions('contacts', ['loadContacts', 'addContact', 'updateContact', 'deleteContact']),
+    ...mapActions('contacts', ['loadContacts', 'addContact', 'updateContact', 'deleteContact', 'addContactsFromCsv']),
     ...mapActions('sms', ['sendSmsToContact']),
     
+    handleFileUpload(event) {
+      this.csvFile = event.target.files[0];
+    },
+
+    async uploadCsv() {
+      if (!this.csvFile) return;
+      const result = await this.addContactsFromCsv(this.csvFile);
+      if (result.success) {
+        this.successMessage = result.message;
+        this.closeCsvModal();
+      }
+    },
+
+    closeCsvModal() {
+      this.showCsvModal = false;
+      this.csvFile = null;
+    },
+
     async saveContact() {
       let result
       if (this.editingContact) {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const contactController = require('../controllers/contactController');
 
+router.post('/csv', contactController.createContactFromCsv);
 router.get('/', contactController.getContacts);
 router.get('/:id', contactController.getContactById);
 router.post('/', contactController.createContact);
