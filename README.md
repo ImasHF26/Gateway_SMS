@@ -213,30 +213,5 @@ Un fichier `.env.example` documente les variables requises sans exposer de secre
 
 ---
 
-## 📤 Pousser le projet vers GitHub
-
-Pour configurer et pousser le projet vers le dépôt GitHub cible :
-
-```bash
-# Vérifier l'état local
-git status
-
-# Ajouter les fichiers modifiés
-git add .
-
-# Créer le commit
-git commit -m "Mise à jour majeure : passerelle SMS, Dataviz, synchronisation d'état réel et modèles personnalisés"
-
-# Associer le dépôt distant GitHub
-git remote set-url origin https://github.com/ImasHF26/Gateway_SMS.git
-# (ou si nouveau remote : git remote add origin https://github.com/ImasHF26/Gateway_SMS.git)
-
-# Pousser vers la branche principale
-git branch -M main
-git push -u origin main
-```
-
----
-
 ## 📄 Licence
 Ce projet est développé à des fins professionnelles et de démonstration. Tous droits réservés.
