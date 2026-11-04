@@ -33,8 +33,8 @@ class SmsService {
         headers: {
           'Content-Type': 'application/json'
         },
-        timeout: 10000, // Timeout de 10 secondes
-        validateStatus: () => true // Transférer tous les codes de statut
+        timeout: 10000,
+        validateStatus: () => true
       });
 
       console.log('Réponse SMSGate:', response.status, response.data);
@@ -50,7 +50,7 @@ class SmsService {
       }
     } catch (error) {
       console.error('Erreur lors de l\'envoi du SMS:', error.message);
-      
+
       let errorMessage = error.message;
       let errorDetails = {};
 
@@ -96,11 +96,42 @@ class SmsService {
     return this.sendSms(phoneNumbers, message);
   }
 
+  async getMessageStatus(messageId) {
+    try {
+      const response = await axios.get(`${this.baseUrl}/message/${messageId}`, {
+        auth: {
+          username: this.username,
+          password: this.password
+        },
+        timeout: 5000,
+        validateStatus: () => true
+      });
+
+      if (response.status >= 200 && response.status < 300) {
+        return {
+          success: true,
+          data: response.data,
+          status: response.status
+        };
+      } else {
+        return {
+          success: false,
+          status: response.status,
+          error: `HTTP ${response.status}: ${JSON.stringify(response.data)}`
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
   async testConnection() {
     try {
       console.log('Test de connexion à SMSGate:', this.baseUrl);
-      
-      // Test de connexion basique
+
       const response = await axios.get(this.baseUrl, {
         auth: {
           username: this.username,
@@ -111,7 +142,7 @@ class SmsService {
       });
 
       console.log('Test de connexion SMSGate:', response.status);
-      
+
       if (response.status >= 200 && response.status < 400) {
         return {
           success: true,
@@ -127,7 +158,7 @@ class SmsService {
       }
     } catch (error) {
       console.error('Échec du test de connexion SMSGate:', error.message);
-      
+
       let errorMessage = error.message;
       if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
         errorMessage = `Impossible de se connecter à SMSGate à l'adresse ${this.baseUrl}. Vérifiez que l'application est démarrée sur votre smartphone.`;

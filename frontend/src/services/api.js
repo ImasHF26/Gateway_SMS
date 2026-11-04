@@ -67,6 +67,27 @@ export default {
     return apiClient.get('/sms/history')
   },
 
+  checkSmsStatus(messageId) {
+    return apiClient.get(`/sms/status/${messageId}`)
+  },
+
+  // Modèles de messages (Templates)
+  getTemplates() {
+    return apiClient.get('/templates')
+  },
+
+  createTemplate(template) {
+    return apiClient.post('/templates', template)
+  },
+
+  updateTemplate(id, template) {
+    return apiClient.put(`/templates/${id}`, template)
+  },
+
+  deleteTemplate(id) {
+    return apiClient.delete(`/templates/${id}`)
+  },
+
   // Test
   testConnection() {
     return apiClient.get('/test')

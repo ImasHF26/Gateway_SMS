@@ -193,20 +193,82 @@ Exemple:
 
               <!-- Message -->
               <div class="mb-4">
-                <label for="message" class="form-label">Message *</label>
-                <textarea 
-                  class="form-control" 
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label for="message" class="form-label mb-0 fw-bold">Message *</label>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    @click="openSaveAsTemplateModal"
+                    :disabled="!message.trim()"
+                    title="Enregistrer ce texte comme modèle réutilisable"
+                  >
+                    <i class="fas fa-bookmark me-1"></i>
+                    Enregistrer comme modèle
+                  </button>
+                </div>
+
+                <!-- Variables dynamiques rapides -->
+                <div class="mb-2 d-flex flex-wrap align-items-center gap-1">
+                  <small class="text-muted me-1">Variables :</small>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light border py-0 px-2"
+                    @click="insertTag('{nom}')"
+                    title="Insère le nom complet du contact"
+                  >
+                    <code>{nom}</code>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light border py-0 px-2"
+                    @click="insertTag('{prenom}')"
+                    title="Insère le prénom du contact"
+                  >
+                    <code>{prenom}</code>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light border py-0 px-2"
+                    @click="insertTag('{date}')"
+                    title="Insère la date du jour"
+                  >
+                    <code>{date}</code>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light border py-0 px-2"
+                    @click="insertTag('{heure}')"
+                    title="Insère l'heure courante"
+                  >
+                    <code>{heure}</code>
+                  </button>
+                </div>
+
+                <textarea
+                  class="form-control"
                   id="message"
+                  ref="messageTextarea"
                   rows="4"
                   v-model="message"
-                  placeholder="Tapez votre message ici..."
+                  placeholder="Tapez votre message ici ou choisissez un modèle rapide..."
                   required
                 ></textarea>
-                <div class="form-text">
-                  {{ message.length }} caractères
-                  <span v-if="message.length > 160" class="text-warning">
-                    (Plus de 160 caractères, peut être facturé comme plusieurs SMS)
-                  </span>
+                <div class="d-flex justify-content-between align-items-center form-text mt-1">
+                  <div>
+                    {{ message.length }} caractères
+                    <span v-if="message.length > 160" class="text-warning">
+                      ({{ Math.ceil(message.length / 160) }} SMS)
+                    </span>
+                    <span v-else class="text-muted">(1 SMS)</span>
+                  </div>
+                  <button
+                    v-if="message.length > 0"
+                    type="button"
+                    class="btn btn-link btn-sm text-danger text-decoration-none p-0"
+                    @click="message = ''"
+                  >
+                    <i class="fas fa-times me-1"></i>Effacer
+                  </button>
                 </div>
               </div>
 
@@ -292,44 +354,214 @@ Exemple:
           </div>
         </div>
 
-        <!-- Modèles de messages -->
+        <!-- Modèles de messages personnalisables -->
         <div class="card mt-3">
-          <div class="card-header">
+          <div class="card-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0">
-              <i class="fas fa-clipboard me-2"></i>
+              <i class="fas fa-clipboard-list me-2"></i>
               Modèles rapides
             </h6>
+            <button
+              class="btn btn-sm btn-outline-primary"
+              @click="openNewTemplateModal"
+              title="Créer un modèle personnalisé"
+            >
+              <i class="fas fa-plus me-1"></i>
+              Nouveau
+            </button>
           </div>
           <div class="card-body">
-            <div class="d-grid gap-2">
-              <button 
-                class="btn btn-outline-secondary btn-sm text-start"
-                @click="message = 'Bonjour ! Ceci est un message de test.'"
+            <!-- Filtre catégories -->
+            <div class="mb-2 d-flex flex-wrap gap-1">
+              <button
+                class="btn btn-xs py-0 px-2"
+                :class="selectedCategory === '' ? 'btn-primary' : 'btn-outline-secondary'"
+                @click="selectedCategory = ''"
               >
-                Message de test
+                Tous
               </button>
-              <button 
-                class="btn btn-outline-secondary btn-sm text-start"
-                @click="message = 'Rappel: Votre rendez-vous est prévu demain à 14h.'"
+              <button
+                v-for="cat in templateCategories"
+                :key="cat"
+                class="btn btn-xs py-0 px-2"
+                :class="selectedCategory === cat ? 'btn-primary' : 'btn-outline-secondary'"
+                @click="selectedCategory = cat"
               >
-                Rappel de rendez-vous
+                {{ cat }}
               </button>
-              <button 
-                class="btn btn-outline-secondary btn-sm text-start"
-                @click="message = 'Bonne année ! Tous nos vœux de bonheur et de réussite.'"
+            </div>
+
+            <!-- Liste des modèles -->
+            <div v-if="loadingTemplates" class="text-center py-2">
+              <span class="spinner-border spinner-border-sm text-primary"></span>
+            </div>
+            <div v-else-if="filteredTemplates.length === 0" class="text-center text-muted py-2 small">
+              Aucun modèle dans cette catégorie.
+            </div>
+            <div v-else class="d-grid gap-2" style="max-height: 320px; overflow-y: auto;">
+              <div
+                v-for="tpl in filteredTemplates"
+                :key="tpl.id"
+                class="border rounded p-2 position-relative template-card"
+                :class="{ 'border-primary': activeTemplateId === tpl.id }"
               >
-                Vœux
-              </button>
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <span class="fw-bold small text-truncate" :title="tpl.title">
+                    {{ tpl.title }}
+                  </span>
+                  <div>
+                    <span class="badge bg-light text-dark border me-1" style="font-size: 0.7rem;">
+                      {{ tpl.category || 'Général' }}
+                    </span>
+                    <button
+                      v-if="!tpl.is_system"
+                      class="btn btn-link text-danger p-0 ms-1 btn-delete-tpl"
+                      @click.stop="confirmDeleteTemplate(tpl)"
+                      title="Supprimer ce modèle"
+                    >
+                      <i class="fas fa-trash-alt fa-xs"></i>
+                    </button>
+                  </div>
+                </div>
+                <p class="text-muted small mb-2 text-truncate-2">
+                  {{ tpl.content }}
+                </p>
+                <div class="d-flex gap-1">
+                  <button
+                    class="btn btn-outline-primary btn-sm py-0 px-2 flex-grow-1"
+                    @click="applyTemplate(tpl)"
+                    title="Remplacer le message"
+                  >
+                    <i class="fas fa-arrow-left me-1"></i> Utiliser
+                  </button>
+                  <button
+                    class="btn btn-outline-secondary btn-sm py-0 px-2"
+                    @click="appendTemplate(tpl)"
+                    title="Ajouter à la suite du message actuel"
+                  >
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Modal : Créer / Modifier un modèle personnalisé -->
+    <div
+      class="modal fade"
+      :class="{ show: showTemplateModal }"
+      :style="{ display: showTemplateModal ? 'block' : 'none' }"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="fas fa-magic me-2 text-primary"></i>
+              {{ templateForm.id ? 'Modifier le modèle' : 'Nouveau modèle personnalisé' }}
+            </h5>
+            <button type="button" class="btn-close" @click="closeTemplateModal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Titre du modèle *</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="templateForm.title"
+                placeholder="Ex: Confirmation de commande, Relance client..."
+                required
+              >
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Catégorie</label>
+              <div class="input-group">
+                <select class="form-select" v-model="templateForm.category">
+                  <option value="Général">Général</option>
+                  <option value="Rappel">Rappel</option>
+                  <option value="Marketing">Marketing / Offre</option>
+                  <option value="Notification">Notification</option>
+                  <option value="Salutations">Salutations</option>
+                  <option value="Personnalisé">Personnalisé</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label fw-bold mb-0">Contenu du modèle *</label>
+                <div class="d-flex gap-1">
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-light border py-0 px-1"
+                    @click="insertTagInForm('{nom}')"
+                  >
+                    <code>{nom}</code>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-light border py-0 px-1"
+                    @click="insertTagInForm('{prenom}')"
+                  >
+                    <code>{prenom}</code>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-light border py-0 px-1"
+                    @click="insertTagInForm('{date}')"
+                  >
+                    <code>{date}</code>
+                  </button>
+                </div>
+              </div>
+              <textarea
+                class="form-control"
+                rows="4"
+                v-model="templateForm.content"
+                placeholder="Rédigez le texte de votre modèle personnalisé..."
+                required
+              ></textarea>
+              <div class="form-text">
+                {{ templateForm.content.length }} caractères
+                <span class="text-muted ms-2">
+                  (Les balises <code>{nom}</code> seront remplacées lors de l'envoi)
+                </span>
+              </div>
+            </div>
+
+            <div v-if="templateError" class="alert alert-danger py-2">
+              <small>{{ templateError }}</small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeTemplateModal">
+              Annuler
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="!templateForm.title.trim() || !templateForm.content.trim() || savingTemplate"
+              @click="saveTemplate"
+            >
+              <span v-if="savingTemplate" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="fas fa-save me-1"></i>
+              Enregistrer le modèle
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Backdrop modal -->
+    <div v-if="showTemplateModal" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
+import api from '@/services/api'
 
 export default {
   name: 'SendSmsPage',
@@ -341,13 +573,39 @@ export default {
       phoneNumbersText: '',
       message: '',
       successMessage: '',
-      contactSearchQuery: ''
+      contactSearchQuery: '',
+      // Modèles de messages
+      templates: [],
+      loadingTemplates: false,
+      selectedCategory: '',
+      activeTemplateId: null,
+      showTemplateModal: false,
+      savingTemplate: false,
+      templateError: '',
+      templateForm: {
+        id: null,
+        title: '',
+        category: 'Général',
+        content: ''
+      }
     }
   },
   computed: {
     ...mapGetters('contacts', ['allContacts']),
     ...mapGetters('sms', { isSending: 'isSending', error: 'getError' }),
-    
+
+    templateCategories() {
+      const cats = new Set(this.templates.map(t => t.category || 'Général'))
+      return Array.from(cats)
+    },
+
+    filteredTemplates() {
+      if (!this.selectedCategory) {
+        return this.templates
+      }
+      return this.templates.filter(t => (t.category || 'Général') === this.selectedCategory)
+    },
+
     filteredContacts() {
       if (!this.allContacts) {
         return [];
@@ -446,11 +704,148 @@ export default {
     
     clearError() {
       this.$store.commit('sms/SET_ERROR', null)
+    },
+
+    // Méthodes pour les modèles rapides
+    async loadTemplates() {
+      this.loadingTemplates = true
+      try {
+        const response = await api.getTemplates()
+        if (response.success && response.data) {
+          this.templates = response.data
+        }
+      } catch (err) {
+        console.warn('Impossible de charger les modèles depuis l\'API, utilisation des modèles par défaut:', err)
+        // Fallback par défaut si l'API n'est pas encore joignable
+        if (this.templates.length === 0) {
+          this.templates = [
+            { id: 1, title: 'Message de test', content: 'Bonjour ! Ceci est un message de test envoyé depuis notre passerelle SMS.', category: 'Test', is_system: 1 },
+            { id: 2, title: 'Rappel de rendez-vous', content: 'Bonjour {nom}, nous vous rappelons votre rendez-vous prévu demain à 14h00.', category: 'Rappel', is_system: 1 },
+            { id: 3, title: 'Offre promotionnelle', content: 'Bonjour {nom} ! Profitez de notre offre exclusive valable jusqu\'à la fin de la semaine.', category: 'Marketing', is_system: 1 },
+            { id: 4, title: 'Vœux & Salutations', content: 'Bonne année {nom} ! Toute notre équipe vous présente ses meilleurs vœux.', category: 'Salutations', is_system: 1 }
+          ]
+        }
+      } finally {
+        this.loadingTemplates = false
+      }
+    },
+
+    openNewTemplateModal() {
+      this.templateForm = {
+        id: null,
+        title: '',
+        category: 'Personnalisé',
+        content: ''
+      }
+      this.templateError = ''
+      this.showTemplateModal = true
+    },
+
+    openSaveAsTemplateModal() {
+      this.templateForm = {
+        id: null,
+        title: this.message.length > 25 ? this.message.substring(0, 25) + '...' : 'Nouveau modèle',
+        category: 'Personnalisé',
+        content: this.message.trim()
+      }
+      this.templateError = ''
+      this.showTemplateModal = true
+    },
+
+    closeTemplateModal() {
+      this.showTemplateModal = false
+      this.templateError = ''
+    },
+
+    async saveTemplate() {
+      if (!this.templateForm.title.trim() || !this.templateForm.content.trim()) {
+        this.templateError = 'Le titre et le contenu sont obligatoires.'
+        return
+      }
+
+      this.savingTemplate = true
+      this.templateError = ''
+      try {
+        const res = await api.createTemplate({
+          title: this.templateForm.title.trim(),
+          category: this.templateForm.category || 'Personnalisé',
+          content: this.templateForm.content.trim()
+        })
+
+        if (res.success && res.data) {
+          this.templates.unshift(res.data)
+          this.activeTemplateId = res.data.id
+          this.closeTemplateModal()
+          this.successMessage = `Modèle "${res.data.title}" enregistré avec succès !`
+          setTimeout(() => {
+            if (this.successMessage.includes('Modèle')) {
+              this.successMessage = ''
+            }
+          }, 3000)
+        }
+      } catch (err) {
+        this.templateError = err.response?.data?.error || err.message || 'Erreur lors de l\'enregistrement'
+      } finally {
+        this.savingTemplate = false
+      }
+    },
+
+    async confirmDeleteTemplate(tpl) {
+      if (!confirm(`Supprimer définitivement le modèle "${tpl.title}" ?`)) return
+      try {
+        await api.deleteTemplate(tpl.id)
+        this.templates = this.templates.filter(t => t.id !== tpl.id)
+        if (this.activeTemplateId === tpl.id) {
+          this.activeTemplateId = null
+        }
+      } catch (err) {
+        alert('Erreur lors de la suppression: ' + (err.message || 'inconnue'))
+      }
+    },
+
+    applyTemplate(tpl) {
+      this.activeTemplateId = tpl.id
+      this.message = tpl.content
+      // Focus sur le textarea
+      if (this.$refs.messageTextarea) {
+        this.$refs.messageTextarea.focus()
+      }
+    },
+
+    appendTemplate(tpl) {
+      if (this.message.trim()) {
+        this.message = this.message.trim() + '\n' + tpl.content
+      } else {
+        this.message = tpl.content
+      }
+      if (this.$refs.messageTextarea) {
+        this.$refs.messageTextarea.focus()
+      }
+    },
+
+    insertTag(tag) {
+      const textarea = this.$refs.messageTextarea
+      if (!textarea) {
+        this.message += tag
+        return
+      }
+      const start = textarea.selectionStart || this.message.length
+      const end = textarea.selectionEnd || this.message.length
+      this.message = this.message.substring(0, start) + tag + this.message.substring(end)
+      this.$nextTick(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start + tag.length, start + tag.length)
+      })
+    },
+
+    insertTagInForm(tag) {
+      this.templateForm.content += tag
     }
   },
-  
+
   mounted() {
     this.loadContacts()
+    this.loadTemplates()
   }
 }
 </script>
@@ -478,5 +873,32 @@ export default {
 
 .btn-outline-secondary:hover {
   color: #000;
+}
+
+.btn-xs {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+}
+
+.template-card {
+  transition: all 0.2s ease;
+  background-color: #fafafa;
+}
+
+.template-card:hover {
+  background-color: #f0f7ff;
+  border-color: #b8daff !important;
+}
+
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.modal {
+  background-color: rgba(0, 0, 0, 0.5);
 }
 </style>

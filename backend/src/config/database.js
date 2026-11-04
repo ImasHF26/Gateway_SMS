@@ -43,6 +43,18 @@ class Database {
       )
     `;
 
+    const createTemplatesTable = `
+      CREATE TABLE IF NOT EXISTS templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT DEFAULT 'Général',
+        is_system INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
     this.db.run(createContactsTable, (err) => {
       if (err) {
         console.error('Erreur lors de la création de la table contacts:', err.message);
@@ -56,6 +68,64 @@ class Database {
         console.error('Erreur lors de la création de la table sms_history:', err.message);
       } else {
         console.log('Table sms_history créée ou existe déjà');
+        // Migration : ajouter la colonne gateway_message_id si elle n'existe pas
+        this.db.run(
+          `ALTER TABLE sms_history ADD COLUMN gateway_message_id TEXT`,
+          (alterErr) => {
+            if (alterErr && !alterErr.message.includes('duplicate column')) {
+              // Colonne existe déjà, c'est normal — on ignore
+            } else if (!alterErr) {
+              console.log('Colonne gateway_message_id ajoutée à sms_history');
+            }
+          }
+        );
+        // Migration : ajouter la colonne delivery_status pour le statut réel de la passerelle
+        this.db.run(
+          `ALTER TABLE sms_history ADD COLUMN delivery_status TEXT DEFAULT 'unknown'`,
+          (alterErr) => {
+            if (alterErr && !alterErr.message.includes('duplicate column')) {
+              // Colonne existe déjà
+            } else if (!alterErr) {
+              console.log('Colonne delivery_status ajoutée à sms_history');
+            }
+          }
+        );
+        // Migration : ajouter la colonne status_checked_at pour la date de dernière vérification
+        this.db.run(
+          `ALTER TABLE sms_history ADD COLUMN status_checked_at DATETIME`,
+          (alterErr) => {
+            if (alterErr && !alterErr.message.includes('duplicate column')) {
+              // Colonne existe déjà
+            } else if (!alterErr) {
+              console.log('Colonne status_checked_at ajoutée à sms_history');
+            }
+          }
+        );
+      }
+    });
+
+    this.db.run(createTemplatesTable, (err) => {
+      if (err) {
+        console.error('Erreur lors de la création de la table templates:', err.message);
+      } else {
+        console.log('Table templates créée ou existe déjà');
+        // Insérer les modèles par défaut s'il n'y en a pas
+        this.db.get('SELECT COUNT(*) as count FROM templates WHERE is_system = 1', (countErr, row) => {
+          if (!countErr && row && row.count === 0) {
+            const defaultTemplates = [
+              ['Message de test', 'Bonjour ! Ceci est un message de test envoyé depuis notre passerelle SMS.', 'Test', 1],
+              ['Rappel de rendez-vous', 'Bonjour {nom}, nous vous rappelons votre rendez-vous prévu demain à 14h00. En cas d\'empêchement, merci de nous contacter.', 'Rappel', 1],
+              ['Offre promotionnelle', 'Bonjour {nom} ! Profitez de notre offre exclusive valable jusqu\'à la fin de la semaine. Rendez-vous sur notre site.', 'Marketing', 1],
+              ['Confirmation de commande', 'Bonjour {nom}, votre commande #{numero} est validée et en cours de préparation. Merci de votre confiance.', 'Notification', 1],
+              ['Vœux & Salutations', 'Bonne année {nom} ! Toute notre équipe vous présente ses meilleurs vœux de santé, de bonheur et de succès.', 'Salutations', 1]
+            ];
+            const stmt = this.db.prepare('INSERT INTO templates (title, content, category, is_system) VALUES (?, ?, ?, ?)');
+            defaultTemplates.forEach(t => stmt.run(t));
+            stmt.finalize(() => {
+              console.log('Modèles de messages par défaut insérés');
+            });
+          }
+        });
       }
     });
   }
@@ -172,10 +242,10 @@ class Database {
   // Méthodes pour l'historique SMS
   addSmsHistory(smsData) {
     return new Promise((resolve, reject) => {
-      const { contact_id, phone_number, message, status } = smsData;
+      const { contact_id, phone_number, message, status, gateway_message_id } = smsData;
       this.db.run(
-        'INSERT INTO sms_history (contact_id, phone_number, message, status) VALUES (?, ?, ?, ?)',
-        [contact_id, phone_number, message, status],
+        'INSERT INTO sms_history (contact_id, phone_number, message, status, gateway_message_id) VALUES (?, ?, ?, ?, ?)',
+        [contact_id, phone_number, message, status, gateway_message_id || null],
         function(err) {
           if (err) {
             reject(err);
@@ -187,10 +257,43 @@ class Database {
     });
   }
 
+  updateSmsDeliveryStatus(smsId, deliveryStatus, gatewayMessageId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE sms_history
+         SET delivery_status = ?,
+             status = ?,
+             gateway_message_id = COALESCE(?, gateway_message_id),
+             status_checked_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [deliveryStatus, deliveryStatus === 'Delivered' ? 'sent' : (deliveryStatus === 'Failed' ? 'failed' : 'pending'), gatewayMessageId, smsId],
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ changes: this.changes });
+          }
+        }
+      );
+    });
+  }
+
+  getSmsById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM sms_history WHERE id = ?', [id], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
   getSmsHistory() {
     return new Promise((resolve, reject) => {
       const query = `
-        SELECT 
+        SELECT
           sh.*,
           c.name as contact_name
         FROM sms_history sh
@@ -201,7 +304,84 @@ class Database {
         if (err) {
           reject(err);
         } else {
+          // Ajouter delivery_status par défaut pour les anciens enregistrements
+          const enriched = rows.map(row => ({
+            ...row,
+            delivery_status: row.delivery_status || 'unknown',
+            gateway_message_id: row.gateway_message_id || null
+          }));
+          resolve(enriched);
+        }
+      });
+    });
+  }
+
+  // Méthodes pour les modèles (Templates)
+  getAllTemplates() {
+    return new Promise((resolve, reject) => {
+      this.db.all('SELECT * FROM templates ORDER BY is_system DESC, created_at DESC', (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
           resolve(rows);
+        }
+      });
+    });
+  }
+
+  getTemplateById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM templates WHERE id = ?', [id], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  addTemplate(template) {
+    return new Promise((resolve, reject) => {
+      const { title, content, category } = template;
+      this.db.run(
+        'INSERT INTO templates (title, content, category, is_system) VALUES (?, ?, ?, 0)',
+        [title, content, category || 'Personnalisé'],
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ id: this.lastID, ...template, is_system: 0 });
+          }
+        }
+      );
+    });
+  }
+
+  updateTemplate(id, template) {
+    return new Promise((resolve, reject) => {
+      const { title, content, category } = template;
+      this.db.run(
+        'UPDATE templates SET title = ?, content = ?, category = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [title, content, category || 'Personnalisé', id],
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ id, ...template, changes: this.changes });
+          }
+        }
+      );
+    });
+  }
+
+  deleteTemplate(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM templates WHERE id = ?', [id], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ deletedId: id, changes: this.changes });
         }
       });
     });

@@ -8,6 +8,7 @@ const contactRoutes = require('./src/api/routes/contactRoutes');
 const smsRoutes = require('./src/api/routes/smsRoutes');
 const vonageRoutes = require('./src/api/routes/vonageRoutes');
 const testRoutes = require('./src/api/routes/testRoutes');
+const templateRoutes = require('./src/api/routes/templateRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,7 +26,8 @@ const db = new Database();
 app.use('/api/contacts', contactRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/vonage-sms', vonageRoutes);
-app.use('/api', testRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api', testRoutes); // Routes de test et de santé
 
 
 

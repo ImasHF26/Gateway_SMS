@@ -9,6 +9,10 @@
         <i class="fas fa-sync-alt me-2"></i>
         Actualiser
       </button>
+      <button class="btn btn-outline-warning ms-2" @click="refreshAllStatuses" :disabled="refreshingAll">
+        <i :class="refreshingAll ? 'fas fa-spinner fa-spin me-2' : 'fas fa-satellite-dish me-2'"></i>
+        {{ refreshingAll ? 'Vérification...' : 'Vérifier statuts passerelle' }}
+      </button>
     </div>
 
     <!-- Messages d'erreur -->
@@ -24,42 +28,90 @@
       </div>
     </div>
 
-    <!-- Statistiques -->
+    <!-- Statistiques & Dataviz -->
     <div v-else class="row mb-4">
       <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card text-center h-100 border-primary">
           <div class="card-body">
             <i class="fas fa-paper-plane fa-2x text-primary mb-2"></i>
             <h4 class="card-title">{{ totalSms }}</h4>
-            <p class="card-text text-muted">SMS envoyés</p>
+            <p class="card-text text-muted mb-0">SMS envoyés</p>
           </div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card text-center h-100 border-success">
           <div class="card-body">
             <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
             <h4 class="card-title">{{ successfulSms }}</h4>
-            <p class="card-text text-muted">Réussis</p>
+            <p class="card-text text-muted mb-0">Réussis ({{ successRate }}%)</p>
           </div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card text-center h-100 border-danger">
           <div class="card-body">
             <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
             <h4 class="card-title">{{ failedSms }}</h4>
-            <p class="card-text text-muted">Échoués</p>
+            <p class="card-text text-muted mb-0">Échoués / Erreurs</p>
           </div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card text-center">
+        <div class="card text-center h-100 border-warning">
           <div class="card-body">
             <i class="fas fa-clock fa-2x text-warning mb-2"></i>
             <h4 class="card-title">{{ pendingSms }}</h4>
-            <p class="card-text text-muted">En attente</p>
+            <p class="card-text text-muted mb-0">En attente</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barre de Dataviz / Taux de délivrabilité -->
+    <div class="card mb-4" v-if="totalSms > 0">
+      <div class="card-header bg-light">
+        <h6 class="mb-0">
+          <i class="fas fa-chart-bar me-2"></i>
+          Taux de Délivrabilité & Performance de la Passerelle
+        </h6>
+      </div>
+      <div class="card-body">
+        <div class="progress mb-3" style="height: 25px;">
+          <div
+            class="progress-bar bg-success"
+            role="progressbar"
+            :style="{ width: successRate + '%' }"
+            :aria-valuenow="successRate"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            Réussis ({{ successRate }}%)
+          </div>
+          <div
+            class="progress-bar bg-warning text-dark"
+            role="progressbar"
+            :style="{ width: pendingRate + '%' }"
+            :aria-valuenow="pendingRate"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            En attente
+          </div>
+          <div
+            class="progress-bar bg-danger"
+            role="progressbar"
+            :style="{ width: failedRate + '%' }"
+            :aria-valuenow="failedRate"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            Échoués
+          </div>
+        </div>
+        <div class="d-flex justify-content-between text-muted small">
+          <span><i class="fas fa-info-circle me-1"></i> Appareil connecté : <strong>SMS-Gateway (192.168.137.11)</strong></span>
+          <span>Total analysé : <strong>{{ totalSms }} messages</strong></span>
         </div>
       </div>
     </div>
@@ -78,7 +130,7 @@
             <label for="statusFilter" class="form-label">Statut</label>
             <select class="form-select" id="statusFilter" v-model="statusFilter">
               <option value="">Tous les statuts</option>
-              <option value="sent">Envoyés</option>
+              <option value="sent">Envoyés / Délivrés</option>
               <option value="failed">Échoués</option>
               <option value="pending">En attente</option>
             </select>
@@ -174,15 +226,29 @@
                     <i :class="getStatusIcon(sms.status)" class="me-1"></i>
                     {{ getStatusText(sms.status) }}
                   </span>
+                  <br v-if="sms.delivery_status && sms.delivery_status !== 'unknown'">
+                  <small v-if="sms.delivery_status && sms.delivery_status !== 'unknown'" class="text-muted">
+                    <i class="fas fa-satellite-dish me-1"></i>{{ sms.delivery_status }}
+                  </small>
                 </td>
                 <td class="text-center">
-                  <button 
-                    class="btn btn-sm btn-outline-info"
-                    @click="showSmsDetails(sms)"
-                    title="Voir les détails"
-                  >
-                    <i class="fas fa-eye"></i>
-                  </button>
+                  <div class="btn-group btn-group-sm">
+                    <button
+                      class="btn btn-outline-info"
+                      @click="showSmsDetails(sms)"
+                      title="Voir les détails"
+                    >
+                      <i class="fas fa-eye"></i>
+                    </button>
+                    <button
+                      class="btn btn-outline-warning"
+                      @click="refreshSmsStatus(sms)"
+                      title="Vérifier le statut réel"
+                      :disabled="sms._checking"
+                    >
+                      <i :class="sms._checking ? 'fas fa-spinner fa-spin' : 'fas fa-sync-alt'"></i>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -242,31 +308,54 @@
               <div class="col-md-6">
                 <h6>Informations générales</h6>
                 <table class="table table-borderless table-sm">
-                  <tr>
-                    <td><strong>Date d'envoi:</strong></td>
-                    <td>{{ formatDate(selectedSms.sent_at) }}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Destinataire:</strong></td>
-                    <td>
-                      {{ selectedSms.contact_name || 'Contact externe' }}
-                      <br>
-                      <small class="text-muted">{{ selectedSms.phone_number }}</small>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><strong>Statut:</strong></td>
-                    <td>
-                      <span :class="getStatusClass(selectedSms.status)">
-                        <i :class="getStatusIcon(selectedSms.status)" class="me-1"></i>
-                        {{ getStatusText(selectedSms.status) }}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><strong>Longueur:</strong></td>
-                    <td>{{ selectedSms.message.length }} caractères</td>
-                  </tr>
+                  <tbody>
+                    <tr>
+                      <td><strong>Date d'envoi:</strong></td>
+                      <td>{{ formatDate(selectedSms.sent_at) }}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Destinataire:</strong></td>
+                      <td>
+                        {{ selectedSms.contact_name || 'Contact externe' }}
+                        <br>
+                        <small class="text-muted">{{ selectedSms.phone_number }}</small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Statut App:</strong></td>
+                      <td>
+                        <span :class="getStatusClass(selectedSms.status)">
+                          <i :class="getStatusIcon(selectedSms.status)" class="me-1"></i>
+                          {{ getStatusText(selectedSms.status) }}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Statut Passerelle:</strong></td>
+                      <td>
+                        <span :class="getDeliveryStatusClass(selectedSms.delivery_status)">
+                          <i :class="getDeliveryStatusIcon(selectedSms.delivery_status)" class="me-1"></i>
+                          {{ selectedSms.delivery_status || 'Non vérifié' }}
+                        </span>
+                        <button
+                          class="btn btn-outline-warning btn-sm ms-2"
+                          @click="refreshSmsStatus(selectedSms)"
+                          :disabled="selectedSms._checking"
+                        >
+                          <i :class="selectedSms._checking ? 'fas fa-spinner fa-spin' : 'fas fa-sync-alt'"></i>
+                          Vérifier
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Longueur:</strong></td>
+                      <td>{{ selectedSms.message.length }} caractères</td>
+                    </tr>
+                    <tr v-if="selectedSms.status_checked_at">
+                      <td><strong>Dernière vérif.:</strong></td>
+                      <td>{{ formatDate(selectedSms.status_checked_at) }}</td>
+                    </tr>
+                  </tbody>
                 </table>
               </div>
               <div class="col-md-6">
@@ -293,6 +382,7 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
+import api from '@/services/api'
 
 export default {
   name: 'HistoryPage',
@@ -304,7 +394,8 @@ export default {
       currentPage: 1,
       itemsPerPage: 10,
       showDetailsModal: false,
-      selectedSms: null
+      selectedSms: null,
+      refreshingAll: false
     }
   },
   computed: {
@@ -320,17 +411,32 @@ export default {
     totalSms() {
       return this.smsHistory.length
     },
-    
+
     successfulSms() {
       return this.smsHistory.filter(sms => sms.status === 'sent').length
     },
-    
+
     failedSms() {
       return this.smsHistory.filter(sms => sms.status === 'failed').length
     },
-    
+
     pendingSms() {
       return this.smsHistory.filter(sms => sms.status === 'pending').length
+    },
+
+    successRate() {
+      if (this.totalSms === 0) return 0
+      return Math.round((this.successfulSms / this.totalSms) * 100)
+    },
+
+    pendingRate() {
+      if (this.totalSms === 0) return 0
+      return Math.round((this.pendingSms / this.totalSms) * 100)
+    },
+
+    failedRate() {
+      if (this.totalSms === 0) return 0
+      return Math.round((this.failedSms / this.totalSms) * 100)
     },
     
     filteredHistory() {
@@ -489,6 +595,75 @@ export default {
     
     clearError() {
       this.$store.commit('sms/SET_ERROR', null)
+    },
+
+    getDeliveryStatusClass(status) {
+      switch (status) {
+        case 'Delivered':
+          return 'badge bg-success'
+        case 'Sent':
+          return 'badge bg-info'
+        case 'Processed':
+          return 'badge bg-primary'
+        case 'Pending':
+          return 'badge bg-warning text-dark'
+        case 'Failed':
+          return 'badge bg-danger'
+        default:
+          return 'badge bg-secondary'
+      }
+    },
+
+    getDeliveryStatusIcon(status) {
+      switch (status) {
+        case 'Delivered':
+          return 'fas fa-check-double'
+        case 'Sent':
+          return 'fas fa-check'
+        case 'Processed':
+          return 'fas fa-cog'
+        case 'Pending':
+          return 'fas fa-clock'
+        case 'Failed':
+          return 'fas fa-exclamation-triangle'
+        default:
+          return 'fas fa-question'
+      }
+    },
+
+    async refreshSmsStatus(sms) {
+      // Marquer le SMS comme en cours de vérification
+      sms._checking = true
+      try {
+        const result = await api.checkSmsStatus(sms.id)
+        if (result.success && result.data) {
+          // Mettre à jour les données localement
+          sms.delivery_status = result.data.delivery_status
+          sms.status_checked_at = result.data.checked_at
+          // Mettre à jour le statut principal selon le delivery
+          if (result.data.delivery_status === 'Delivered' || result.data.delivery_status === 'Sent') {
+            sms.status = 'sent'
+          } else if (result.data.delivery_status === 'Failed') {
+            sms.status = 'failed'
+          } else if (result.data.delivery_status === 'Pending' || result.data.delivery_status === 'Processed') {
+            sms.status = 'pending'
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification du statut:', error)
+      } finally {
+        sms._checking = false
+      }
+    },
+
+    async refreshAllStatuses() {
+      this.refreshingAll = true
+      for (const sms of this.paginatedHistory) {
+        await this.refreshSmsStatus(sms)
+        // Petit délai pour ne pas surcharger la passerelle
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+      this.refreshingAll = false
     }
   },
   

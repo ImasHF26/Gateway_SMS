@@ -12,6 +12,14 @@
         </button>
         
         <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <span class="nav-link text-light px-2 py-1 bg-dark bg-opacity-25 rounded d-flex align-items-center mt-1">
+                <i class="fas fa-circle text-success fa-xs me-2 animate-pulse"></i>
+                <small>Passerelle: <strong>Connectée</strong></small>
+              </span>
+            </li>
+          </ul>
           <ul class="navbar-nav ms-auto">
             <li class="nav-item">
               <router-link class="nav-link" to="/" active-class="active">
